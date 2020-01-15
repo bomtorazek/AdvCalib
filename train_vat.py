@@ -606,7 +606,9 @@ def main():
                 if USECALI:
                     if (args.lambda_semi > 0 or args.lambda_semi_adv > 0) and i_iter >= args.semi_start_adv:
                         iter_images = (i_iter*args.iter_size*args.batch_size + sub_i*args.batch_size)
+                        kk = 0
                         if iter_images % (10*train_dataset_size) >= 9*train_dataset_size:
+                            kk +=1
                             with torch.no_grad():
                                 _, prediction = torch.max(softsx, 1)
                                 labels_mask = ((labels > 0) * (labels != 255)) | (prediction.data.cpu() > 0)
@@ -621,10 +623,11 @@ def main():
                                 labels_list.append(real_label)
 
                         if iter_images % (10*train_dataset_size) ==0 and iter_images !=0:
+                            print kk
+                            kk = 0
                             logits = torch.cat(logits_list).cuda()  # overall 5000 images in val,  #logits >> 5000,100, (1464*321*321,)
                             labels_cali = torch.cat(labels_list).cuda()
                             print(len(logits))
-                            print(len(labels_cali))
                             before_temperature_nll = nll_criterion(logits, labels_cali).item()  ####modify
                             before_temperature_ece, _, _= ece_criterion(logits, labels_cali)  # (1464*321*321,)
                             before_temperature_ece = before_temperature_ece.item()
