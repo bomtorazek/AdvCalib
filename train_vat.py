@@ -57,7 +57,7 @@ LAMBDA_ADV_PRED =0.01 #0.01 # lambda_adv for labeled 0.01
 
 PARTIAL_DATA=0.125 ##
 
-SEMI_START=  5000 # 5000 #12500 #6250 # start semi after 5000 iterations, 6250 for 8
+SEMI_START= 5000 #12500 #6250 # start semi after 5000 iterations, 6250 for 8
 LAMBDA_SEMI=0.1  #lambda_semi
 MASK_T=0.2 # mask threshold
 
@@ -293,9 +293,9 @@ def main():
     model_D.train()
     model_D.cuda(args.gpu)
 
-    if USECALI:
-        model_cali = ModelWithTemperature(model, model_D)
-        model_cali.cuda(args.gpu)
+    # if USECALI:
+    #     model_cali = ModelWithTemperature(model, model_D)
+    #     model_cali.cuda(args.gpu)
 
 
     if not os.path.exists(args.snapshot_dir):
@@ -384,8 +384,8 @@ def main():
     optimizer_D.zero_grad() #initialize
 
     if USECALI:
-        optimizer_cali = optim.LBFGS([model_cali.temperature], lr=0.01, max_iter=50)
-        optimizer_cali.zero_grad()
+        # optimizer_cali = optim.LBFGS([model_cali.temperature], lr=0.01, max_iter=50)
+        # optimizer_cali.zero_grad()
 
         nll_criterion = BCEWithLogitsLoss().cuda() # BCE!!
         ece_criterion = ECELoss().cuda()
@@ -544,7 +544,7 @@ def main():
                     else:
                         semi_ratio =1
                         semi_gt = (torch.FloatTensor(semi_gt)) # (8,321,321)
-                        confidence = torch.FloatTensor(F.sigmoid(model_cali.temperature_scale(D_out)).data.cpu().numpy()) # (8*321*321)
+                        confidence = torch.FloatTensor(F.sigmoid(model_cali.temperature_scale(D_out.view(-1))).data.cpu().numpy()) # (8*321*321)
                         loss_semi = args.lambda_semi * calibrated_loss_calc(pred, semi_gt, args.gpu, confidence,accuracies, n_bin) #  L_semi = Yhat * log(S(X)) # loss_calc(pred, semi_gt, args.gpu)
                         # pred(8,21,321,321)
 
@@ -606,28 +606,29 @@ def main():
                 if USECALI:
                     if (args.lambda_semi > 0 or args.lambda_semi_adv > 0) and i_iter >= args.semi_start_adv:
                         iter_images = (i_iter*args.iter_size*args.batch_size + sub_i*args.batch_size)
-                        kk = 0
-                        if iter_images % (10*train_dataset_size) >= 9*train_dataset_size:
-                            kk +=1
-                            with torch.no_grad():
-                                _, prediction = torch.max(softsx, 1)
-                                labels_mask = ((labels > 0) * (labels != 255)) | (prediction.data.cpu() > 0)
-                                labels_cali = labels[labels_mask]
-                                prediction = prediction[labels_mask]
-                                fake_mask = (labels_cali.data.cpu().numpy() != prediction.data.cpu().numpy())
-                                real_label = make_conf_label(1, fake_mask)  # (10*321*321, ) 0 or 1 (fake or real)
+                        #if iter_images % (10*train_dataset_size) >= 9*train_dataset_size:
+                        with torch.no_grad():
+                            _, prediction = torch.max(softsx, 1)
+                            labels_mask = ((labels > 0) * (labels != 255)) | (prediction.data.cpu() > 0)
+                            labels_cali = labels[labels_mask]
+                            prediction = prediction[labels_mask]
+                            fake_mask = (labels_cali.data.cpu().numpy() != prediction.data.cpu().numpy())
+                            real_label = make_conf_label(1, fake_mask)  # (10*321*321, ) 0 or 1 (fake or real)
 
-                                logits = D_out.squeeze(dim=1)
-                                logits = logits[labels_mask]
-                                logits_list.append(logits)  # initialize
-                                labels_list.append(real_label)
+                            logits = D_out.squeeze(dim=1)
+                            logits = logits[labels_mask]
+                            logits_list.append(logits)  # initialize
+                            labels_list.append(real_label)
 
-                        if iter_images % (10*train_dataset_size) ==0 and iter_images !=0:
-                            print kk
-                            kk = 0
+                        if iter_images % train_dataset_size == 0  and iter_images != 0 :
+
+                            model_cali = ModelWithTemperature(model, model_D)
+                            model_cali.cuda(args.gpu)
+                            optimizer_cali = optim.LBFGS([model_cali.temperature], lr=0.01, max_iter=50)
+                            optimizer_cali.zero_grad()
+
                             logits = torch.cat(logits_list).cuda()  # overall 5000 images in val,  #logits >> 5000,100, (1464*321*321,)
                             labels_cali = torch.cat(labels_list).cuda()
-                            print(len(logits))
                             before_temperature_nll = nll_criterion(logits, labels_cali).item()  ####modify
                             before_temperature_ece, _, _= ece_criterion(logits, labels_cali)  # (1464*321*321,)
                             before_temperature_ece = before_temperature_ece.item()
