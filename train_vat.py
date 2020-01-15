@@ -621,10 +621,9 @@ def main():
                             labels_list.append(real_label)
 
                         if iter_images % train_dataset_size == 0  and iter_images != 0 :
-
                             model_cali = ModelWithTemperature(model, model_D)
                             model_cali.cuda(args.gpu)
-                            optimizer_cali = optim.LBFGS([model_cali.temperature], lr=0.01, max_iter=50)
+                            optimizer_cali = optim.LBFGS([model_cali.temperature], lr=0.01, max_iter=100)
                             optimizer_cali.zero_grad()
 
                             logits = torch.cat(logits_list).cuda()  # overall 5000 images in val,  #logits >> 5000,100, (1464*321*321,)
