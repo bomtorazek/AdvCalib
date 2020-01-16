@@ -11,5 +11,7 @@ The code are heavily borrowed from Adversarial Learning for Semi-supervised Sema
 ## Prerequisite
 
 * CUDA/CUDNN
-* pytorch >= 0.2 (We only support 0.4 for evaluation. Will migrate the code to 0.4 soon.)
-* python-opencv >=3.4.0 (3.3 will cause extra GPU memory on multithread data loader)
+* Torchvision
+* Numpy
+* pytorch == 0.4.0 
+* python-opencv == 3.4.2 
